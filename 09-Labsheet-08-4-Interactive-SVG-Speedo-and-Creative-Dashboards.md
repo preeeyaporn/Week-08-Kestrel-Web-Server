@@ -655,4 +655,526 @@ setInterval(pollTelemetry, 150);
 1. บันทึกวิดีโอคลิปสั้น (15-30 วินาที) โดยในคลิปต้องเห็น:
    - นิ้วมือนักศึกษากำลังหมุนตัวต้านทานปรับค่าได้บนบอร์ด ESP32
    - หน้าจอคอมพิวเตอร์ที่เข็มไมล์ Speedometer / VU Meter กวาดตามมืออย่างชัดเจน
-2. แนบภาพหน้าจอซอร์สโค้ดและรายงานการทดลอง
+1. แนบภาพหน้าจอซอร์สโค้ดและรายงานการทดลอง
+https://drive.google.com/file/d/1BjCcbNe-gF282dphieTQmEElFWHK7_9n/view?usp=drivesdk
+
+```html
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>IoT Edge VU Meter (LDR Sensor)</title>
+
+    <style>
+
+        body {
+
+            background-color: #0b0f19;
+
+            color: #e2e8f0;
+
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            height: 100vh;
+
+            margin: 0;
+
+        }
+
+        .dashboard-card {
+
+            background-color: #1e293b;
+
+            padding: 40px;
+
+            border-radius: 16px;
+
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+
+            text-align: center;
+
+            border: 1px solid #334155;
+
+        }
+
+        h2 { margin-top: 0; color: #38bdf8; }
+
+        .led { transition: opacity 0.1s ease, filter 0.1s ease; }
+
+        .stats-container {
+
+            margin-top: 30px;
+
+            background-color: #0f172a;
+
+            padding: 15px;
+
+            border-radius: 10px;
+
+            display: grid;
+
+            grid-template-columns: 1fr 1fr;
+
+            gap: 15px;
+
+            text-align: left;
+
+            font-size: 14px;
+
+        }
+
+        .stat-box { display: flex; flex-direction: column; }
+
+        .stat-label { color: #94a3b8; font-size: 12px; margin-bottom: 4px; }
+
+        .stat-value { font-weight: bold; color: #f8fafc; font-size: 16px; }
+
+        .source-box { grid-column: span 2; text-align: center; margin-top: 10px; color: #64748b; font-size: 12px; }
+
+    </style>
+
+</head>
+
+<body>
+
+  
+
+    <div class="dashboard-card">
+
+        <h2>Light Intensity VU Meter</h2>
+
+        <!-- โค้ด SVG หน้าปัด VU Meter -->
+
+        <svg width="250" height="40" viewBox="0 0 250 40" id="vumeter" style="margin: 20px 0;">
+
+            <rect class="led" x="5" y="5" width="18" height="30" rx="3" fill="#22c55e" opacity="0.15"/>
+
+            <rect class="led" x="28" y="5" width="18" height="30" rx="3" fill="#22c55e" opacity="0.15"/>
+
+            <rect class="led" x="51" y="5" width="18" height="30" rx="3" fill="#22c55e" opacity="0.15"/>
+
+            <rect class="led" x="74" y="5" width="18" height="30" rx="3" fill="#22c55e" opacity="0.15"/>
+
+            <rect class="led" x="97" y="5" width="18" height="30" rx="3" fill="#22c55e" opacity="0.15"/>
+
+            <rect class="led" x="120" y="5" width="18" height="30" rx="3" fill="#22c55e" opacity="0.15"/>
+
+            <rect class="led" x="143" y="5" width="18" height="30" rx="3" fill="#eab308" opacity="0.15"/>
+
+            <rect class="led" x="166" y="5" width="18" height="30" rx="3" fill="#eab308" opacity="0.15"/>
+
+            <rect class="led" x="189" y="5" width="18" height="30" rx="3" fill="#ef4444" opacity="0.15"/>
+
+            <rect class="led" x="212" y="5" width="18" height="30" rx="3" fill="#ef4444" opacity="0.15"/>
+
+        </svg>
+
+  
+
+        <!-- ตัวเลขเปอร์เซ็นต์ขนาดใหญ่ -->
+
+        <h1 id="disp-percent" style="font-size: 48px; margin: 10px 0; color: #f8fafc;">0.0%</h1>
+
+  
+
+        <!-- กรอบแสดงค่าดิบและสถานะ -->
+
+        <div class="stats-container">
+
+            <div class="stat-box">
+
+                <span class="stat-label">RAW ADC</span>
+
+                <span class="stat-value" id="disp-raw">0</span>
+
+            </div>
+
+            <div class="stat-box">
+
+                <span class="stat-label">VOLTAGE</span>
+
+                <span class="stat-value" id="disp-volt">0.00 V</span>
+
+            </div>
+
+            <div class="source-box" id="disp-source">📡 Waiting for data...</div>
+
+        </div>
+
+    </div>
+
+  
+
+    <!-- โค้ด JavaScript ควบคุมหน้าจอ -->
+
+    <script>
+
+        // ฟังก์ชันอัปเดตแถบไฟ VU Meter
+
+        function updateVuMeter(percentage) {
+
+            const leds = document.querySelectorAll('#vumeter .led');
+
+            const totalLeds = leds.length; // 10 หลอด
+
+            const activeCount = Math.round((percentage / 100.0) * totalLeds);
+
+  
+
+            leds.forEach((led, index) => {
+
+                if (index < activeCount) {
+
+                    led.style.opacity = '1.0';
+
+                    const color = led.getAttribute('fill');
+
+                    led.style.filter = `drop-shadow(0 0 8px ${color})`;
+
+                } else {
+
+                    led.style.opacity = '0.15';
+
+                    led.style.filter = 'none';
+
+                }
+
+            });
+
+        }
+
+  
+
+        // ฟังก์ชันดึงข้อมูลจากเซิร์ฟเวอร์
+
+        async function pollTelemetry() {
+
+            try {
+
+                const res = await fetch('/api/telemetry');
+
+                if (!res.ok) return;
+
+                const data = await res.json();
+
+  
+
+                // อัปเดตตัวเลข
+
+                document.getElementById('disp-percent').textContent = data.percentage.toFixed(1) + '%';
+
+                document.getElementById('disp-raw').textContent = data.rawValue;
+
+                document.getElementById('disp-volt').textContent = data.voltage.toFixed(2) + ' V';
+
+                document.getElementById('disp-source').textContent = '📡 ' + data.dataSource;
+
+  
+
+                // เรียกฟังก์ชันอัปเดตไฟ LED
+
+                updateVuMeter(data.percentage);
+
+  
+
+            } catch (err) {
+
+                console.error('Polling error:', err);
+
+            }
+
+        }
+
+  
+
+        // วนลูปดึงข้อมูลทุกๆ 150 มิลลิวินาที
+
+        setInterval(pollTelemetry, 150);
+
+    </script>
+
+</body>
+
+</html>
+```
+
+Program
+```csharp
+using System.IO.Ports;
+
+  
+
+var builder = WebApplication.CreateBuilder(args);
+
+  
+
+// ลงทะเบียน Services สำหรับจัดการข้อมูลเบื้องหลัง
+
+builder.Services.AddSingleton<TelemetryStateStore>();
+
+builder.Services.AddHostedService<SerialBridgeWorker>();
+
+  
+
+var app = builder.Build();
+
+  
+
+// 1. สั่งให้เซิร์ฟเวอร์แสดงหน้าเว็บ (index.html) ที่เราเพิ่งทำไป
+
+app.UseDefaultFiles();
+
+app.UseStaticFiles();
+
+  
+
+// 2. Endpoint สำหรับส่งข้อมูลให้หน้าเว็บ (ที่หน้าเว็บกำลังรอรับอยู่)
+
+app.MapGet("/api/telemetry", (TelemetryStateStore state) => {
+
+    var (raw, voltage, percent, source, updated) = state.GetSnapshot();
+
+    return Results.Ok(new {
+
+        sensor = "ESP32-LDR",
+
+        rawValue = raw,
+
+        voltage = voltage,
+
+        percentage = percent,
+
+        dataSource = source,
+
+        timestamp = updated.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+
+    });
+
+});
+
+  
+
+app.Run();
+
+  
+
+// ============================================================================
+
+// คลาสเก็บสถานะข้อมูล
+
+// ============================================================================
+
+public class TelemetryStateStore
+
+{
+
+    private readonly object _lock = new();
+
+    private int _rawValue = 0;
+
+    private DateTime _lastUpdated = DateTime.UtcNow;
+
+    private string _source = "Initializing";
+
+  
+
+    public void Update(int rawValue, string source)
+
+    {
+
+        lock (_lock)
+
+        {
+
+            _rawValue = rawValue;
+
+            _source = source;
+
+            _lastUpdated = DateTime.UtcNow;
+
+        }
+
+    }
+
+  
+
+    public (int raw, double voltage, double percent, string source, DateTime updated) GetSnapshot()
+
+    {
+
+        lock (_lock)
+
+        {
+
+            double voltage = Math.Round((_rawValue / 4095.0) * 3.3, 2);
+
+            double percent = Math.Round((_rawValue / 4095.0) * 100.0, 1);
+
+            return (_rawValue, voltage, percent, _source, _lastUpdated);
+
+        }
+
+    }
+
+}
+
+  
+
+// ============================================================================
+
+// คลาสสำหรับอ่านข้อมูลจาก ESP32 ผ่านสาย USB
+
+// ============================================================================
+
+public class SerialBridgeWorker : BackgroundService
+
+{
+
+    private readonly TelemetryStateStore _stateStore;
+
+  
+
+    public SerialBridgeWorker(TelemetryStateStore stateStore)
+
+    {
+
+        _stateStore = stateStore;
+
+    }
+
+  
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+
+    {
+
+        await Task.Yield();
+
+  
+
+        while (!stoppingToken.IsCancellationRequested)
+
+        {
+
+            string[] availablePorts = SerialPort.GetPortNames();
+
+            if (availablePorts.Length > 0)
+
+            {
+
+                string? targetPort = "COM3"; // ตรงนี้ตั้งเป็น COM3 ไว้ให้แล้วครับ
+
+                string? selectedPort = null;
+
+                if (!string.IsNullOrEmpty(targetPort) && availablePorts.Contains(targetPort, StringComparer.OrdinalIgnoreCase))
+
+                {
+
+                    selectedPort = targetPort;
+
+                }
+
+                else
+
+                {
+
+                    selectedPort = availablePorts.FirstOrDefault(p => !p.Equals("COM1", StringComparison.OrdinalIgnoreCase)) ?? availablePorts[0];
+
+                }
+
+  
+
+                try
+
+                {
+
+                    using var serial = new SerialPort(selectedPort, 115200);
+
+                    serial.ReadTimeout = 2000;
+
+                    serial.Open();
+
+                    serial.DiscardInBuffer();
+
+  
+
+                    while (!stoppingToken.IsCancellationRequested && serial.IsOpen)
+
+                    {
+
+                        try
+
+                        {
+
+                            if (serial.BytesToRead > 0)
+
+                            {
+
+                                string line = serial.ReadLine().Trim();
+
+                                if (int.TryParse(line, out int val))
+
+                                {
+
+                                    _stateStore.Update(val, $"Live Hardware ({selectedPort})");
+
+                                }
+
+                            }
+
+                            else
+
+                            {
+
+                                await Task.Delay(50, stoppingToken);
+
+                            }
+
+                        }
+
+                        catch (TimeoutException) { await Task.Delay(50, stoppingToken); }
+
+                    }
+
+                }
+
+                catch (Exception) { /* เงียบไว้ถ้าเชื่อมต่อพอร์ตไม่ได้ */ }
+
+            }
+
+  
+
+            // โหมดจำลองข้อมูลถ้าสายหลุด
+
+            for (int i = 0; i < 20 && !stoppingToken.IsCancellationRequested; i++)
+
+            {
+
+                double t = Environment.TickCount64 / 1000.0;
+
+                int simAdc = (int)((Math.Sin(t * 1.5) + 1.0) / 2.0 * 4095);
+
+                _stateStore.Update(simAdc, "Simulation Mode (Sine Wave)");
+
+                await Task.Delay(100, stoppingToken);
+
+            }
+
+        }
+
+    }
+
+}
+```
