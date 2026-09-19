@@ -210,4 +210,5 @@ python -m esptool -p COM24 --chip esp32 -b 460800 --before default_reset --after
 - **เมื่ออยู่ในสภาพแสงปกติ (ไฟห้อง):** ค่า ADC จะรักษาระดับคงที่อยู่ในช่วงกลาง (ประมาณ 2,800 - 3,000)
 - **ผลจากการใช้ EMA Filter:** จากการสังเกตเพิ่มเติมพบว่า เมื่อมีการเปลี่ยนแปลงแสงอย่างฉับพลัน (เช่น การเปิดไฟฉายส่องทันที) ตัวเลข ADC จะไม่กระโดดพรวดพราด แต่จะค่อยๆ ไต่ระดับค่าขึ้นหรือลงอย่างนุ่มนวลและเสถียร ซึ่งเป็นผลมาจากการกรองสัญญาณรบกวนด้วยสมการ Exponential Moving Average
 บันทึกภาพถ่ายการต่อวงจรและภาพหน้าจอ Monitor ลงในรายงานผลการทดลอง
-![[Pasted image 20260908145030.png]]![[Pasted image 20260908145051.png]]
+<img width="1021" height="587" alt="image" src="https://github.com/user-attachments/assets/6c19a74d-593c-4464-976a-ce24e68de9b1" />
+<img width="1012" height="743" alt="image" src="https://github.com/user-attachments/assets/e49595be-4c00-43e5-8612-66e5ca7d7e94" />
